@@ -1,0 +1,2 @@
+var MINER = 'miner';
+

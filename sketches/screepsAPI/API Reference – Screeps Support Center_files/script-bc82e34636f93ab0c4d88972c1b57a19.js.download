@@ -1,0 +1,275 @@
+/*
+ * jQuery v1.9.1 included
+ */
+
+if(/sections\/201054011/.test(document.location.href)) {
+	var style = document.createElement('STYLE');  
+  document.head.appendChild(style);
+  style.sheet.insertRule('.article-list { display: none }');
+  document.location.href = '/hc/en-us/articles/203084991-API-Reference';
+}
+
+if(/sections\/201939862/.test(document.location.href)) {
+	var style = document.createElement('STYLE');  
+  document.head.appendChild(style);
+  style.sheet.insertRule('.article-list { display: none }');
+  document.location.href = '/hc/en-us/articles/205989812-PTR-API-Reference';
+}
+
+
+$(document).ready(function() {
+
+  // social share popups
+  $(".share a").click(function(e) {
+    e.preventDefault();
+    window.open(this.href, "", "height = 500, width = 500");
+  });
+
+  // toggle the share dropdown in communities
+  $(".share-label").on("click", function(e) {
+    e.stopPropagation();
+    var isSelected = this.getAttribute("aria-selected") == "true";
+    this.setAttribute("aria-selected", !isSelected);
+    $(".share-label").not(this).attr("aria-selected", "false");
+  });
+
+  $(document).on("click", function() {
+    $(".share-label").attr("aria-selected", "false");
+  });
+
+  // show form controls when the textarea receives focus or backbutton is used and value exists
+  var $answerbodyTextarea = $(".answer-body textarea"),
+  $answerFormControls = $(".answer-form-controls"),
+  $commentContainerTextarea = $(".comment-container textarea"),
+  $commentContainerFormControls = $(".comment-form-controls");
+
+  $answerbodyTextarea.one("focus", function() {
+    $answerFormControls.show();
+  });
+
+  $commentContainerTextarea.one("focus", function() {
+    $commentContainerFormControls.show();
+  });
+
+  if($commentContainerTextarea.val() !== "") {
+    $commentContainerFormControls.show();
+  }
+
+  if($answerbodyTextarea.val() !== "") {
+    $answerFormControls.show();
+  }
+  
+  var newTabsContainer = document.createElement('DIV');
+  newTabsContainer.className = 'new-tabs-container';
+  $('.knowledge-base .category:first-child h2').after(newTabsContainer);
+  
+  $('.knowledge-base .category:first-child .section').each(function() {    
+    var section = this;
+		var newTab = document.createElement('A');
+    newTab.className = 'new-tab';
+    newTab.innerHTML = $(this).find('h3').text();
+    newTabsContainer.appendChild(newTab);    
+    
+    $(newTab).click(function() {
+			$('.knowledge-base .category:first-child .section').hide();
+      $(section).show();
+      $('.knowledge-base .category:first-child .new-tab').removeClass('active');
+      $(this).addClass('active');
+    });
+  });
+  
+  $('.knowledge-base .category:first-child .new-tab:first-child').click();
+  
+  
+ /* $('.question_details p').html('You can use <a href="https://help.github.com/articles/markdown-basics/" target="_blank">Markdown</a> to format your message.').show();
+  
+  $('.answer-form-controls').prepend($('<div class="pull-left">You can use <a href="https://help.github.com/articles/markdown-basics/" target="_blank">Markdown</a> to format your message</div>'));
+  
+  $('.comment-form-controls').prepend($('<div style="float: left">You can use <a href="https://help.github.com/articles/markdown-basics/" target="_blank">Markdown</a> to format your message</div>'));*/
+  
+  function processWysiwygTextarea(elm) {    
+    function _try() {            
+      setTimeout(function() {
+        var next = $(elm).next();
+        if(next.attr('role') != 'application') {
+          _try();
+           return;
+        }
+        var iframe = next.find('iframe');
+        if(!iframe.length) {
+          _try();
+          return;
+        }
+        var css = 'body {color: #ccc;} strong {color: #fff} pre {background-color: #3C3C3C}';
+        var iframeDoc = iframe[0].contentDocument;
+        var style = document.createElement('style');
+     		style.type= "text/css";
+     		if(style.styleSheet) style.styleSheet.cssText= css;//IE only
+     		else style.appendChild(iframeDoc.createTextNode(css));
+     		iframeDoc.getElementsByTagName('head')[0].appendChild(style);                
+        
+        //$(elm).next().find('[role=toolbar]').append('<span role="button" class="wysiwyg-icon-blockquote"></span>');
+        
+      }, 10);
+    }
+    
+    _try();
+  }
+    
+  $('textarea[data-helper="wysiwyg"]').focus(function(e) {    
+    processWysiwygTextarea(this);
+  });
+  
+  $('textarea[data-helper="wysiwyg"]').each(function(e) {
+    processWysiwygTextarea(this);
+  });
+  
+  var inApiReference = false;
+  $('.breadcrumbs li').each(function() {
+    if($(this).attr('title') == 'API Reference') {
+      inApiReference = true;
+    }
+    if($(this).attr('title') == 'PTR API Reference') {
+      inApiReference = true;
+      $('.live-api').hide();
+      $('.ptr-api').show();
+    }
+  });
+  
+  $('pre').each(function(i, el) {    
+    if(!$(el).find('> code').length) {
+      $(el).wrapInner('<code></code>');  
+      $(el).find('br').replaceWith("\n");
+    }
+  });
+  
+  $('pre code').addClass('language-javascript');
+  
+  
+  $('#user-menu a').each(function() {
+    console.log($(this).text());
+    if(/Open agent interface/.test($(this).text())) {
+      $('.agent-only').show();
+    }
+  });
+  
+  
+  // angular
+  
+  var mod = angular.module('app', ['app.badge','app.badge.paths']);
+  
+  mod.directive('apiRoot', function() {
+        return {
+          restrict: 'C',
+            controller: function() {
+                this.properties = [];
+                this.methods = [];
+            }
+        }
+    });
+
+    mod.directive('apiBlockTemplate', function($sce) {
+        return {
+            restrict: 'C',
+            //require: '^apiRoot',
+            link: function($scope, elm, attrs, ctrl) {
+              var name = elm.find('.api-name');
+              var title = elm.find('.api-title');
+              var type = elm.find('.api-type');
+              var desc = elm.find('.api-desc');             
+              
+              
+              if(desc.length) {
+                var $desc = $('<div class="api-desc">'+desc.html()+'</div>');
+                elm.prepend($desc);
+              }
+              
+              
+              var $title = $('<div class="api-title"><a class="anchor" href="#'+name.html()+'">#</a><span>'+title.html()+'</span></div>');
+              if(type.length) {
+                $title.append($('<div class="api-type">'+type.html()+'</div>'));
+                //ctrl.properties.push({name: name.html()});
+              }
+              else {
+                elm.addClass('api-method');
+                //ctrl.methods.push({name: name.html()});
+              }
+              elm.prepend($title);
+              
+              
+              elm.prepend($('<a name="'+name.html()+'"></a>'));
+              
+              
+              name.remove();
+              title.remove();
+              type.remove();
+              desc.remove();
+              
+              
+              var body = elm.find('.api-body');
+              if(body.length) {
+              	body.hide();
+                var $more = $('<div class="api-more-handle">...</div>');
+                $desc.append($more); 
+                $more.click(function() {
+                  body.toggle();
+                });
+                
+              }
+              
+              elm.removeClass('api-block-template').addClass('api-block');
+            }
+        }
+    });
+  
+  mod.directive('apiContentsTemplate', function() {
+        return {
+            restrict: 'C',
+            require: '^apiRoot',
+            templateUrl: 'apiContentsTpl',
+            link: function($scope, elm, attrs, ctrl) {
+                $scope.properties = ctrl.properties;
+                $scope.methods = ctrl.methods;
+            }
+        }
+    });
+  
+  mod.directive('appUserBadge', function($http) {
+    var requests = {};
+    return {
+      restrict: 'E',
+      template: '<img class="badge" app-badge-src="badgeData">',
+      scope: {
+        username: '@'
+      },
+      link: function($scope, elm) {
+        var req = requests[$scope.username];
+        if(!req) {
+          req = requests[$scope.username] = $http.get('https://screeps.com/api/user/find?username='+$scope.username);
+        }        
+        req.success(function(res) {
+          if(res.ok) {
+            $scope.badgeData = res.user.badge;
+          }
+        });
+      }
+    }
+  });
+  
+  mod.directive('cpuCostLow', function() {
+		return {
+      restrict: 'C',
+      link: function($scope, elm) {
+        if(elm.text() == 'CONST') {
+        	elm.css({cursor: 'help'});
+          elm.append('<sup style="color: #9e967c; border: 1px solid rgba(117, 112, 95, 0.52);; display: inline-block; border-radius: 5px; padding: 5px 3px; margin-left: 3px">?</sup>');
+          elm.attr('title', 'This method changes world state. Its cost is constant and equal to at least 0.2 CPU in case if OK code is returned.');
+        }
+      }
+    }
+  });
+  
+  angular.bootstrap(document, ['app']);
+  
+});
+

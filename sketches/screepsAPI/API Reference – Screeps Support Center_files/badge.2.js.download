@@ -1,0 +1,272 @@
+"use strict";
+var mod = angular.module('app.badge', []);
+function dataUrlToBlob(dataURI, type, callback) {
+  if (typeof dataURI !== 'string') {
+    throw new Error('Invalid argument: dataURI must be a string');
+  }
+  dataURI = dataURI.split(',');
+  type = type || dataURI[0].split(':')[1].split(';')[0];
+  var byteString = atob(dataURI[1]),
+      byteStringLength = byteString.length,
+      arrayBuffer = new ArrayBuffer(byteStringLength),
+      intArray = new Uint8Array(arrayBuffer);
+  for (var i = 0; i < byteStringLength; i++) {
+    intArray[i] = byteString.charCodeAt(i);
+  }
+  var blob = new Blob([intArray], {type: type});
+  callback(blob);
+}
+HTMLCanvasElement.prototype.toBlob || Object.defineProperty(HTMLCanvasElement.prototype, 'toBlob', {value: function(callback, type, quality) {
+    dataUrlToBlob(this.toDataURL(type, quality), type, callback);
+  }});
+function hsl2rgb(H, S, L) {
+  var C = (1 - Math.abs((2 * L) - 1)) * S;
+  var H_ = H / 60;
+  var X = C * (1 - Math.abs((H_ % 2) - 1));
+  var R1,
+      G1,
+      B1;
+  if (H === undefined || isNaN(H) || H === null) {
+    R1 = G1 = B1 = 0;
+  } else {
+    if (H_ >= 0 && H_ < 1) {
+      R1 = C;
+      G1 = X;
+      B1 = 0;
+    } else if (H_ >= 1 && H_ < 2) {
+      R1 = X;
+      G1 = C;
+      B1 = 0;
+    } else if (H_ >= 2 && H_ < 3) {
+      R1 = 0;
+      G1 = C;
+      B1 = X;
+    } else if (H_ >= 3 && H_ < 4) {
+      R1 = 0;
+      G1 = X;
+      B1 = C;
+    } else if (H_ >= 4 && H_ < 5) {
+      R1 = X;
+      G1 = 0;
+      B1 = C;
+    } else if (H_ >= 5 && H_ < 6) {
+      R1 = C;
+      G1 = 0;
+      B1 = X;
+    }
+  }
+  var m = L - (C / 2);
+  var R,
+      G,
+      B;
+  R = (R1 + m) * 255;
+  G = (G1 + m) * 255;
+  B = (B1 + m) * 255;
+  R = Math.round(R);
+  G = Math.round(G);
+  B = Math.round(B);
+  function pad(v) {
+    var hex = Number(v).toString(16);
+    if (hex.length < 2) {
+      hex = '0' + hex;
+    }
+    return hex;
+  }
+  return pad(R) + pad(G) + pad(B);
+}
+mod.factory('BadgeGenerator', ["$cacheFactory", "$rootScope", "BadgePaths", "$q", function($cacheFactory, $rootScope, BadgePaths, $q) {
+  var cache = $cacheFactory('badges', {capacity: 1000}),
+      objectUrls = {},
+      DOMURL = window.URL || window.webkitURL || window;
+  ;
+  var oldRemove = cache.remove;
+  cache.remove = function(key) {
+    DOMURL.revokeObjectURL(objectUrls[key]);
+    oldRemove.call(this, key);
+  };
+  function makeKey(opts, width, height) {
+    return ("key_" + opts.type + "_" + (opts.flip ? '1' : '0') + "_" + opts.color1 + "_" + opts.color2 + "_" + opts.color3 + "_" + (opts.param || 0) + "_" + width + "_" + height);
+  }
+  function generateImage(opts, width, height) {
+    return $q((function(resolve, reject) {
+      if (!opts) {
+        resolve(BadgeGenerator.emptyDataUrl);
+        return;
+      }
+      var canvas = document.createElement('canvas'),
+          color1 = _.isString(opts.color1) ? opts.color1 : colors[opts.color1].rgb,
+          color2 = _.isString(opts.color2) ? opts.color2 : colors[opts.color2].rgb,
+          color3 = _.isString(opts.color3) ? opts.color3 : colors[opts.color3].rgb;
+      width = Math.round(width);
+      height = Math.round(height);
+      if (opts.param > 100) {
+        opts.param = 100;
+      }
+      if (opts.param < -100) {
+        opts.param = -100;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      if (_.isNumber(opts.type)) {
+        BadgePaths[opts.type].calc(opts.param);
+      }
+      var rotate = 0;
+      if (opts.flip && _.isNumber(opts.type)) {
+        if (BadgePaths[opts.type].flip == 'rotate180') {
+          rotate = 180;
+        }
+        if (BadgePaths[opts.type].flip == 'rotate90') {
+          rotate = 90;
+        }
+        if (BadgePaths[opts.type].flip == 'rotate45') {
+          rotate = 45;
+        }
+      }
+      var svgData = ("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"" + width + "\" height=\"" + height + "\" viewBox=\"0 0 100 100\" shape-rendering=\"geometricPrecision\">\n                            <defs>\n                                <clipPath id=\"clip\">\n                                    <circle cx=\"50\" cy=\"50\" r=\"52\" />\n                                    <!--<rect x=\"0\" y=\"0\" width=\"100\" height=\"100\"/>-->\n                                </clipPath>\n                            </defs>\n                            <g transform=\"rotate(" + rotate + " 50 50)\">\n                            <rect x=\"0\" y=\"0\" width=\"100\" height=\"100\" fill=\"" + color1 + "\" clip-path=\"url(#clip)\"/>");
+      var path1,
+          path2;
+      if (_.isNumber(opts.type)) {
+        path1 = BadgePaths[opts.type].path1;
+        path2 = BadgePaths[opts.type].path2;
+      } else {
+        path1 = opts.type.path1;
+        path2 = opts.type.path2;
+      }
+      svgData += ("<path d=\"" + path1 + "\" fill=\"" + color2 + "\" clip-path=\"url(#clip)\"/>");
+      if (path2) {
+        svgData += ("<path d=\"" + path2 + "\" fill=\"" + color3 + "\" clip-path=\"url(#clip)\"/>");
+      }
+      svgData += "</g></svg>";
+      var ctx = canvas.getContext('2d');
+      var img = new Image();
+      var svg = new Blob([svgData], {type: 'image/svg+xml'});
+      var url = DOMURL.createObjectURL(svg);
+      img.onload = function() {
+        $rootScope.$applyAsync((function() {
+          img.width = width;
+          img.height = height;
+          ctx.clearRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0);
+          DOMURL.revokeObjectURL(url);
+          canvas.toBlob((function(blob) {
+            canvas = null;
+            img = null;
+            svg = null;
+            ctx = null;
+            resolve(DOMURL.createObjectURL(blob));
+          }));
+        }));
+      };
+      img.src = url;
+    }));
+  }
+  var colors = [],
+      index = 0;
+  colors.push({
+    index: index++,
+    rgb: '#' + hsl2rgb(0, 0, 0.8)
+  });
+  for (var i = 0; i < 19; i++) {
+    colors.push({
+      index: index++,
+      rgb: '#' + hsl2rgb(i * 360 / 19, 0.6, 0.8)
+    });
+  }
+  colors.push({
+    index: index++,
+    rgb: '#' + hsl2rgb(0, 0, 0.5)
+  });
+  for (var i = 0; i < 19; i++) {
+    colors.push({
+      index: index++,
+      rgb: '#' + hsl2rgb(i * 360 / 19, 0.7, 0.5)
+    });
+  }
+  colors.push({
+    index: index++,
+    rgb: '#' + hsl2rgb(0, 0, 0.3)
+  });
+  for (var i = 0; i < 19; i++) {
+    colors.push({
+      index: index++,
+      rgb: '#' + hsl2rgb(i * 360 / 19, 0.4, 0.3)
+    });
+  }
+  colors.push({
+    index: index++,
+    rgb: '#' + hsl2rgb(0, 0, 0.1)
+  });
+  for (var i = 0; i < 19; i++) {
+    colors.push({
+      index: index++,
+      rgb: '#' + hsl2rgb(i * 360 / 19, 0.5, 0.1)
+    });
+  }
+  var BadgeGenerator = {
+    getImageData: function(opts, width, height) {
+      if (!opts) {
+        return $q.when(BadgeGenerator.emptyDataUrl);
+      }
+      var key = makeKey(opts, width, height),
+          result = cache.get(key);
+      if (!result) {
+        result = generateImage(opts, width, height);
+        cache.put(key, result);
+      }
+      return result;
+    },
+    colors: colors
+  };
+  dataUrlToBlob('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQIW2NkAAIAAAoAAggA9GkAAAAASUVORK5CYII=', 'image/png', (function(blob) {
+    BadgeGenerator.emptyDataUrl = DOMURL.createObjectURL(blob);
+  }));
+  return BadgeGenerator;
+}]);
+function badgeDirective(attrName) {
+  return ngInject(["BadgeGenerator", function(BadgeGenerator) {
+    return {link: function($scope, elm, attrs) {
+        var curTime = 0;
+        var update = (function() {
+          if (!elm.attr(attrName)) {
+            elm.attr(attrName, BadgeGenerator.emptyDataUrl);
+          }
+          var time = new Date().getTime(),
+              data = $scope.$eval(attrs[attrs.$normalize('app:badge-' + attrName)]),
+              w = elm.width(),
+              h = elm.height();
+          if (elm[0].getBoundingClientRect) {
+            var bbox = elm[0].getBoundingClientRect();
+            w = Math.round(bbox.width);
+            h = Math.round(bbox.height);
+            if (w < 20) {
+              w = 20;
+              h = 20;
+            }
+          }
+          return BadgeGenerator.getImageData(data, w, h).then((function(dataUrl) {
+            if (time > curTime) {
+              elm.attr(attrName, dataUrl);
+              curTime = time;
+            }
+          }));
+        });
+        var data = $scope.$eval(attrs[attrs.$normalize('app:badge-' + attrName)]);
+        if (!('noAutoWatch' in attrs) && (data && data._watching || attrName == 'src')) {
+          var unwatch = $scope.$watch(_.throttle(update, attrName == 'src' ? 100 : 1000));
+        } else {
+          update();
+        }
+        if ('watchChange' in attrs) {
+          $scope.$watch((function() {
+            return $scope.$eval(attrs[attrs.$normalize('app:badge-' + attrName)]);
+          }), (function(i) {
+            elm.attr(attrName, BadgeGenerator.emptyDataUrl);
+            update();
+          }));
+        }
+        $scope.$on('resize', update);
+      }};
+  }]);
+}
+mod.directive('appBadgeSrc', badgeDirective('src'));
+mod.directive('appBadgeXlinkHref', badgeDirective('xlink:href'));
